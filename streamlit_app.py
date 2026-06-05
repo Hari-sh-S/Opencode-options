@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 st.set_page_config(
     page_title="Options Trading System — Nifty 50",
@@ -28,6 +28,11 @@ from modules.position_sizing import calculate_position_size
 from modules.strategy_template import save_strategy, load_strategies
 from modules.vix import get_vix_quote
 
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def ist_now():
+    return datetime.now(IST).strftime("%d-%b-%Y %I:%M:%S %p")
+
 if "dhan" not in st.session_state:
     st.session_state.dhan = None
 if "auth_status" not in st.session_state:
@@ -41,6 +46,9 @@ if "expiry_list" not in st.session_state:
 
 def main():
     st.title("📊 Options Trading System — Nifty 50")
+    with st.sidebar:
+        st.caption(f"🕐 Last updated: {ist_now()}")
+        st.caption("Market: NSE Nifty 50 • Data: Dhan API")
     st.markdown("---")
 
     tab1, tab2, tab3, tab4 = st.tabs([
