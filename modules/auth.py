@@ -2,12 +2,77 @@ import streamlit as st
 import time
 import pickle
 import os
+import json
 from datetime import datetime, timedelta
 from dhanhq import DhanLogin, dhanhq, DhanContext
 
 TOKEN_CACHE_FILE = "dhan_token_cache.pkl"
+HF_TOKEN_FILE = "dhan_token.json"
+
+def _hf_enabled():
+    return bool(st.secrets.get("HF_TOKEN") and st.secrets.get("HF_DATASET_REPO"))
+
+def _save_token_to_hf(token, expiry):
+    if not _hf_enabled():
+        return
+    try:
+        from huggingface_hub import HfApi
+        repo = st.secrets["HF_DATASET_REPO"]
+        data = json.dumps({
+            "access_token": token,
+            "expiry": expiry.isoformat() if hasattr(expiry, "isoformat") else expiry,
+            "client_id": st.secrets.get("DHAN_CLIENT_ID", ""),
+        })
+        api = HfApi(token=st.secrets["HF_TOKEN"])
+        api.upload_file(
+            path_or_fileobj=data.encode(),
+            path_in_repo=HF_TOKEN_FILE,
+            repo_id=repo,
+            repo_type="dataset",
+        )
+    except Exception:
+        pass
+
+def _load_token_from_hf():
+    if not _hf_enabled():
+        return None
+    try:
+        from huggingface_hub import hf_hub_download
+        repo = st.secrets["HF_DATASET_REPO"]
+        path = hf_hub_download(
+            repo_id=repo,
+            filename=HF_TOKEN_FILE,
+            token=st.secrets["HF_TOKEN"],
+            repo_type="dataset",
+        )
+        with open(path) as f:
+            data = json.load(f)
+        expiry = data.get("expiry")
+        if expiry:
+            if isinstance(expiry, str):
+                expiry = datetime.fromisoformat(expiry)
+            if datetime.now() < expiry:
+                return data.get("access_token")
+    except Exception:
+        pass
+    return None
+
+def _delete_token_from_hf():
+    if not _hf_enabled():
+        return
+    try:
+        from huggingface_hub import HfApi
+        api = HfApi(token=st.secrets["HF_TOKEN"])
+        api.delete_file(
+            path_in_repo=HF_TOKEN_FILE,
+            repo_id=st.secrets["HF_DATASET_REPO"],
+            repo_type="dataset",
+        )
+    except Exception:
+        pass
 
 def get_cached_token():
+    token = None
     if os.path.exists(TOKEN_CACHE_FILE):
         with open(TOKEN_CACHE_FILE, "rb") as f:
             cache = pickle.load(f)
@@ -16,17 +81,24 @@ def get_cached_token():
             if isinstance(expiry, str):
                 expiry = datetime.fromisoformat(expiry)
             if datetime.now() < expiry:
-                return cache["access_token"]
-    return None
+                token = cache["access_token"]
+    if not token:
+        token = _load_token_from_hf()
+        if token:
+            cache_token(token, persist_only=True)
+    return token
 
-def cache_token(access_token):
+def cache_token(access_token, persist_only=False):
     expiry = datetime.now() + timedelta(hours=23, minutes=30)
-    with open(TOKEN_CACHE_FILE, "wb") as f:
-        pickle.dump({"access_token": access_token, "expiry": expiry}, f)
+    if not persist_only:
+        with open(TOKEN_CACHE_FILE, "wb") as f:
+            pickle.dump({"access_token": access_token, "expiry": expiry}, f)
+    _save_token_to_hf(access_token, expiry)
 
 def clear_token_cache():
     if os.path.exists(TOKEN_CACHE_FILE):
         os.remove(TOKEN_CACHE_FILE)
+    _delete_token_from_hf()
 
 def verify_token(token):
     client_id = st.secrets.get("DHAN_CLIENT_ID", "")
@@ -87,9 +159,8 @@ def check_auth_status():
             profile = dhan_login.user_profile(token)
             if profile and profile.get("status") == "success":
                 expiry = None
-                cache_path = TOKEN_CACHE_FILE
-                if os.path.exists(cache_path):
-                    with open(cache_path, "rb") as f:
+                if os.path.exists(TOKEN_CACHE_FILE):
+                    with open(TOKEN_CACHE_FILE, "rb") as f:
                         cache = pickle.load(f)
                     expiry = cache.get("expiry")
                     if isinstance(expiry, str):
