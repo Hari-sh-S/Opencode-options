@@ -44,6 +44,7 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
                 to_date=chunk_to,
                 interval=1,
             )
+            st.info(f"Response: {str(resp.get('remarks', ''))[:300]}")
             if resp.get("status") == "success" and resp.get("data"):
                 data = resp["data"]
                 opt_key = "CE" if option_type.upper() == "CALL" else "PE"
