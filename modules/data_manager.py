@@ -30,18 +30,19 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
         all_dfs = []
         date_chunks = _chunk_dates(from_date, to_date)
         for i, (chunk_from, chunk_to) in enumerate(date_chunks):
+            st.info(f"Calling API: sec_id={int(NIFTY_SECURITY_ID)}, seg=NSE_FNO, type=OPTIDX, flag={expiry_flag}, code={expiry_code}, strike={strike}, opt={option_type}, from={chunk_from}, to={chunk_to}, interval=1, data=[close]")
             resp = dhan.expired_options_data(
                 security_id=int(NIFTY_SECURITY_ID),
-                exchange_segment=dhanhq.NSE_FNO,
+                exchange_segment="NSE_FNO",
                 instrument_type="OPTIDX",
                 expiry_flag=expiry_flag,
                 expiry_code=expiry_code,
                 strike=strike,
                 drv_option_type=option_type,
-                required_data=["open", "high", "low", "close", "volume", "oi", "iv", "spot"],
+                required_data=["close"],
                 from_date=chunk_from,
                 to_date=chunk_to,
-                interval=interval,
+                interval=1,
             )
             if resp.get("status") == "success" and resp.get("data"):
                 data = resp["data"]
