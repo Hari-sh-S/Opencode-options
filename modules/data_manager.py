@@ -29,6 +29,10 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
     try:
         all_dfs = []
         date_chunks = _chunk_dates(from_date, to_date)
+        chunks_with_data = 0
+        chunks_no_data = 0
+        chunks_failed = 0
+        
         for i, (chunk_from, chunk_to) in enumerate(date_chunks):
             resp = dhan.expired_options_data(
                 security_id=int(NIFTY_SECURITY_ID),
@@ -49,18 +53,26 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
                 opt_data = data.get(opt_key) or data.get(opt_key.lower())
                 if opt_data and opt_data.get("timestamp"):
                     all_dfs.append(_parse_candle_response(opt_data))
+                    chunks_with_data += 1
                 else:
-                    st.info(f"Chunk {i+1}/{len(date_chunks)} ({chunk_from} to {chunk_to}): no {opt_key} data")
+                    chunks_no_data += 1
             else:
-                err_msg = resp.get("remarks", resp.get("status", "unknown"))
-                if isinstance(err_msg, dict):
-                    err_msg = err_msg.get("error_message", str(err_msg))
-                st.info(f"Chunk {i+1}/{len(date_chunks)} ({chunk_from} to {chunk_to}): {err_msg}")
+                chunks_failed += 1
+        
         if all_dfs:
             result = pd.concat(all_dfs, ignore_index=True)
             result = result.drop_duplicates(subset="timestamp").sort_values("timestamp").reset_index(drop=True)
+            st.info(f"Data loaded: {chunks_with_data} chunks OK, {chunks_no_data} no data, {chunks_failed} failed. Total bars: {len(result)}")
             return result
-        st.info(f"No data across {len(date_chunks)} chunk(s). Total chunks queried.")
+        
+        st.warning(f"No data found for {strike} {option_type} {expiry_flag} code {expiry_code} ({from_date} to {to_date}). "
+                   f"Chunks: {len(date_chunks)} tried. Suggestions: "
+                   f"1) Try shorter date range (last 6 months), "
+                   f"2) Try MONTH expiry instead of WEEK, "
+                   f"3) Try different strike/option type.")
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Expired options data error: {e}")
         return pd.DataFrame()
     except Exception as e:
         st.warning(f"Expired options data error: {e}")
