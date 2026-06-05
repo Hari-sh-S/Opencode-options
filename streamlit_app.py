@@ -114,12 +114,12 @@ def render_auth_tab():
                             st.error("❌ Auth failed. Check Client ID, PIN, and TOTP.")
                 else:
                     st.error("Please enter TOTP code")
-            with st.expander("🔍 Debug - Token Status"):
-                show = st.checkbox("Show access token (sensitive!)", key="show_token")
-                diag = get_auth_debug_info(show_token=show)
-                st.json(diag)
-                if not diag["hf_enabled"]:
-                    st.warning("HF_TOKEN or HF_DATASET_REPO not set in secrets — token won't persist across restarts.")
+        with st.expander("🔍 Debug - Token Status"):
+            show = st.checkbox("Show access token (sensitive!)", key="show_token")
+            diag = get_auth_debug_info(show_token=show)
+            st.json(diag)
+            if not diag["hf_enabled"]:
+                st.warning("HF_TOKEN or HF_DATASET_REPO not set in secrets — token won't persist across restarts.")
     with col2:
         st.subheader("Data Source")
         st.markdown("""
