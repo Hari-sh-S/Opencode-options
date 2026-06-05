@@ -194,7 +194,7 @@ def check_auth_status():
         clear_token_cache()
     return {"status": "inactive", "token": None, "expires_at": None, "client_id": None}
 
-def get_auth_debug_info(show_token=False):
+def get_auth_debug_info():
     info = {
         "hf_enabled": _hf_enabled(),
         "local_cache_exists": os.path.exists(TOKEN_CACHE_FILE),
@@ -220,8 +220,6 @@ def get_auth_debug_info(show_token=False):
     token = get_cached_token()
     if token:
         info["token_exists"] = True
-        if show_token:
-            info["access_token"] = token
         client_id = st.secrets.get("DHAN_CLIENT_ID", "")
         try:
             dhan_login = DhanLogin(client_id)

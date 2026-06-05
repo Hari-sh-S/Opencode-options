@@ -115,7 +115,7 @@ def render_auth_tab():
                 else:
                     st.error("Please enter TOTP code")
         with st.expander("🔍 Debug - Token Status"):
-            diag = get_auth_debug_info(show_token=True)
+            diag = get_auth_debug_info(show_token=False)
             st.json(diag)
             if not diag["hf_enabled"]:
                 st.warning("HF_TOKEN or HF_DATASET_REPO not set in secrets — token won't persist across restarts.")
