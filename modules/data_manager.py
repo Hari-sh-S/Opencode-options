@@ -29,7 +29,7 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
             to_date=to_date[:10],
             interval=interval,
         )
-        st.caption(f"API resp keys: {list(resp.keys()) if resp else 'None'}, status: {resp.get('status')}")
+        st.caption(f"API resp keys: {list(resp.keys()) if resp else 'None'}, status: {resp.get('status')}, remarks: {resp.get('remarks')}")
         if resp.get("status") == "success" and resp.get("data"):
             data = resp["data"]
             st.caption(f"Data keys: {list(data.keys()) if isinstance(data, dict) else type(data).__name__}")
