@@ -9,7 +9,7 @@ from modules.data_manager import (
 from modules.position_sizing import calculate_position_size
 from modules.execution.order_manager import OrderManager
 from modules.instrument_selector import (
-    select_expiry, select_instrument_atm_offset, select_instrument_by_premium,
+    select_instrument_atm_offset, select_instrument_by_premium,
 )
 
 MARKET_OPEN = dtime(9, 15)
