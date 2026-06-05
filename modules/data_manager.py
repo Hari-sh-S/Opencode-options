@@ -31,7 +31,7 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
         date_chunks = _chunk_dates(from_date, to_date)
         for i, (chunk_from, chunk_to) in enumerate(date_chunks):
             resp = dhan.expired_options_data(
-                security_id=NIFTY_SECURITY_ID,
+                security_id=int(NIFTY_SECURITY_ID),
                 exchange_segment=dhanhq.NSE_FNO,
                 instrument_type="OPTIDX",
                 expiry_flag=expiry_flag,
