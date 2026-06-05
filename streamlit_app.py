@@ -147,9 +147,15 @@ def render_auth_tab():
 
 def render_backtest_tab():
     st.subheader("Backtesting Engine — Expired Options Data")
-    if st.session_state.auth_status["status"] != "active" or st.session_state.dhan is None:
+    if st.session_state.auth_status["status"] != "active":
         st.warning("⚠️ Please authenticate first in the Dhan Auth tab")
         return
+    if st.session_state.dhan is None:
+        dhan, token = get_dhan_client()
+        if dhan is None:
+            st.warning("⚠️ Please authenticate first in the Dhan Auth tab")
+            return
+        st.session_state.dhan = dhan
 
     dhan = st.session_state.dhan
     col1, col2 = st.columns([1, 1])
@@ -299,9 +305,15 @@ def render_backtest_tab():
 
 def render_execution_tab():
     st.subheader("Execution Engine")
-    if st.session_state.auth_status["status"] != "active" or st.session_state.dhan is None:
+    if st.session_state.auth_status["status"] != "active":
         st.warning("⚠️ Please authenticate first")
         return
+    if st.session_state.dhan is None:
+        dhan, token = get_dhan_client()
+        if dhan is None:
+            st.warning("⚠️ Please authenticate first")
+            return
+        st.session_state.dhan = dhan
 
     dhan = st.session_state.dhan
     engine = ExecutionEngine(dhan)
