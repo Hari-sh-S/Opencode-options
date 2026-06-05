@@ -37,6 +37,8 @@ if "dhan" not in st.session_state:
     st.session_state.dhan = None
 if "auth_status" not in st.session_state:
     st.session_state.auth_status = check_auth_status()
+if "auth_token" not in st.session_state:
+    st.session_state.auth_token = get_cached_token()
 if "backtest_results" not in st.session_state:
     st.session_state.backtest_results = None
 if "execution_log" not in st.session_state:
@@ -46,9 +48,7 @@ if "expiry_list" not in st.session_state:
 
 def main():
     st.title("📊 Options Trading System — Nifty 50")
-    with st.sidebar:
-        st.caption(f"🕐 Last updated: {ist_now()}")
-        st.caption("Market: NSE Nifty 50 • Data: Dhan API")
+    st.caption(f"🕐 Last updated: {ist_now()}  •  NSE Nifty 50  •  Data: Dhan API")
     st.markdown("---")
 
     tab1, tab2, tab3, tab4 = st.tabs([
