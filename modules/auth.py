@@ -28,18 +28,21 @@ def clear_token_cache():
     if os.path.exists(TOKEN_CACHE_FILE):
         os.remove(TOKEN_CACHE_FILE)
 
-def authenticate(totp, force_new=False):
+def verify_token(token):
+    client_id = st.secrets.get("DHAN_CLIENT_ID", "")
+    try:
+        dhan_login = DhanLogin(client_id)
+        profile = dhan_login.user_profile(token)
+        return profile and profile.get("status") == "success"
+    except Exception:
+        return False
+
+def authenticate(totp):
     client_id = st.secrets.get("DHAN_CLIENT_ID", "")
     pin = st.secrets.get("DHAN_PIN", "")
     if not client_id or not pin:
         st.error("DHAN_CLIENT_ID and DHAN_PIN must be set in Streamlit secrets")
         return None, None
-    if not force_new:
-        cached = get_cached_token()
-        if cached:
-            dhan_context = DhanContext(client_id, cached)
-            dhan = dhanhq(dhan_context)
-            return dhan, cached
     try:
         dhan_login = DhanLogin(client_id)
         access_token_data = dhan_login.generate_token(pin, totp)
@@ -52,8 +55,13 @@ def authenticate(totp, force_new=False):
         err = access_token_data or {}
         msg = err.get("message", str(err))
         if "2 minutes" in msg:
-            st.warning("⏳ Dhan allows only one token per 2 minutes. Wait 2 min from your last auth, then try again.")
-            st.info("💡 The system will try to reuse your cached token automatically.")
+            cached = get_cached_token()
+            if cached and verify_token(cached):
+                st.info("⏳ Using cached token (Dhan rate limit — 2 min wait). It's still valid.")
+                dhan_context = DhanContext(client_id, cached)
+                dhan = dhanhq(dhan_context)
+                return dhan, cached
+            st.warning("⏳ Dhan allows only one token per 2 minutes. Wait 2 min, then try again.")
         else:
             st.error(f"Auth failed: {msg}")
         return None, None
