@@ -5,8 +5,6 @@ from datetime import datetime, time as dtime
 from modules.formula_parser import parse_formula, evaluate_formula_node
 from modules.data_manager import (
     fetch_index_data, get_live_quote, get_live_index_value, get_option_chain_data,
-    get_current_weekly_expiry, get_next_weekly_expiry,
-    get_current_monthly_expiry, get_next_monthly_expiry,
 )
 from modules.position_sizing import calculate_position_size
 from modules.execution.order_manager import OrderManager
@@ -34,18 +32,11 @@ class ExecutionEngine:
             return {"status": "market_closed", "message": "Market is closed"}
         entry_formula = config.get("entry_formula", "")
         timeframe = config.get("timeframe", "15m")
-        expiry_choice = config.get("expiry_choice", "Current Week")
+        expiry_date = config.get("expiry")
         entry_logic = config.get("entry_logic", "atm")
         atm_offset = config.get("atm_offset", 0)
         target_premium = config.get("target_premium", 200)
         option_type = "CE" if config.get("option_type", "CALL") == "CALL" else "PE"
-        expiry_map = {
-            "Current Week": get_current_weekly_expiry(),
-            "Next Week": get_next_weekly_expiry(),
-            "Current Month": get_current_monthly_expiry(),
-            "Next Month": get_next_monthly_expiry(),
-        }
-        expiry_date = expiry_map.get(expiry_choice, get_current_weekly_expiry())
         index_value = get_live_index_value(self.dhan)
         if not index_value:
             return {"status": "error", "message": "Could not fetch index value"}

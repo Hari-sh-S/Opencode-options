@@ -216,3 +216,42 @@ def resample_to_timeframe(df, target_tf):
     resampled = df.resample(target_tf).agg(agg_dict)
     resampled = resampled.dropna(subset=["open", "high", "low", "close"]).reset_index()
     return resampled
+
+def fetch_index_data(dhan, timeframe="15m", from_date=None, to_date=None, interval=15):
+    try:
+        interval_map_inv = {1: 1, 5: 5, 15: 15, 30: 25, 60: 60}
+        api_interval = interval_map_inv.get(interval, 15)
+        if not from_date:
+            from_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        if not to_date:
+            to_date = datetime.now().strftime("%Y-%m-%d")
+        resp = dhan.intraday_minute_data(
+            security_id=NIFTY_SECURITY_ID,
+            exchange_segment=dhanhq.INDEX,
+            instrument_type="INDEX",
+            from_date=from_date[:10],
+            to_date=to_date[:10],
+            interval=api_interval,
+            oi=False,
+        )
+        if resp.get("status") == "success" and resp.get("data"):
+            rows = resp["data"]
+            records = []
+            for row in rows:
+                ts = row.get("start_time") or row.get("timestamp", "")
+                records.append({
+                    "timestamp": pd.to_datetime(ts),
+                    "open": row.get("open"),
+                    "high": row.get("high"),
+                    "low": row.get("low"),
+                    "close": row.get("close"),
+                    "volume": row.get("volume", 0),
+                })
+            if not records:
+                return pd.DataFrame()
+            df = pd.DataFrame(records)
+            df = df.dropna(subset=["open", "high", "low", "close"]).sort_values("timestamp")
+            return df
+        return pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
