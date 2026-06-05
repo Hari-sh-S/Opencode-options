@@ -9,7 +9,7 @@ st.set_page_config(
     layout="wide",
 )
 
-from modules.auth import authenticate, get_dhan_client, check_auth_status, clear_token_cache, get_cached_token
+from modules.auth import authenticate, get_dhan_client, check_auth_status, clear_token_cache, get_cached_token, get_auth_debug_info
 from modules.formula_parser import validate_formula, parse_formula, evaluate_formula_node
 from modules.formula_reference import FORMULA_REFERENCE
 from modules.data_manager import (
@@ -114,6 +114,11 @@ def render_auth_tab():
                             st.error("❌ Auth failed. Check Client ID, PIN, and TOTP.")
                 else:
                     st.error("Please enter TOTP code")
+            with st.expander("🔍 Debug - Token Status"):
+                diag = get_auth_debug_info()
+                st.json(diag)
+                if not diag["hf_enabled"]:
+                    st.warning("HF_TOKEN or HF_DATASET_REPO not set in secrets — token won't persist across restarts.")
     with col2:
         st.subheader("Data Source")
         st.markdown("""

@@ -12,11 +12,21 @@ HF_TOKEN_FILE = "dhan_token.json"
 def _hf_enabled():
     return bool(st.secrets.get("HF_TOKEN") and st.secrets.get("HF_DATASET_REPO"))
 
+def _ensure_hf_repo():
+    from huggingface_hub import HfApi
+    api = HfApi(token=st.secrets["HF_TOKEN"])
+    repo = st.secrets["HF_DATASET_REPO"]
+    try:
+        api.repo_info(repo_id=repo, repo_type="dataset")
+    except Exception:
+        api.create_repo(repo_id=repo, repo_type="dataset", private=True, exist_ok=True)
+
 def _save_token_to_hf(token, expiry):
     if not _hf_enabled():
         return
     try:
         from huggingface_hub import HfApi
+        _ensure_hf_repo()
         repo = st.secrets["HF_DATASET_REPO"]
         data = json.dumps({
             "access_token": token,
@@ -30,8 +40,8 @@ def _save_token_to_hf(token, expiry):
             repo_id=repo,
             repo_type="dataset",
         )
-    except Exception:
-        pass
+    except Exception as e:
+        st.warning(f"HF token save failed (non-critical): {e}")
 
 def _load_token_from_hf():
     if not _hf_enabled():
@@ -72,27 +82,27 @@ def _delete_token_from_hf():
         pass
 
 def get_cached_token():
-    token = None
     if os.path.exists(TOKEN_CACHE_FILE):
-        with open(TOKEN_CACHE_FILE, "rb") as f:
-            cache = pickle.load(f)
-        if "access_token" in cache and "expiry" in cache:
-            expiry = cache["expiry"]
-            if isinstance(expiry, str):
-                expiry = datetime.fromisoformat(expiry)
-            if datetime.now() < expiry:
-                token = cache["access_token"]
-    if not token:
-        token = _load_token_from_hf()
-        if token:
-            cache_token(token, persist_only=True)
+        try:
+            with open(TOKEN_CACHE_FILE, "rb") as f:
+                cache = pickle.load(f)
+            if "access_token" in cache and "expiry" in cache:
+                expiry = cache["expiry"]
+                if isinstance(expiry, str):
+                    expiry = datetime.fromisoformat(expiry)
+                if datetime.now() < expiry:
+                    return cache["access_token"]
+        except Exception:
+            pass
+    token = _load_token_from_hf()
+    if token:
+        cache_token(token)
     return token
 
-def cache_token(access_token, persist_only=False):
+def cache_token(access_token):
     expiry = datetime.now() + timedelta(hours=23, minutes=30)
-    if not persist_only:
-        with open(TOKEN_CACHE_FILE, "wb") as f:
-            pickle.dump({"access_token": access_token, "expiry": expiry}, f)
+    with open(TOKEN_CACHE_FILE, "wb") as f:
+        pickle.dump({"access_token": access_token, "expiry": expiry}, f)
     _save_token_to_hf(access_token, expiry)
 
 def clear_token_cache():
@@ -174,3 +184,22 @@ def check_auth_status():
         except Exception:
             clear_token_cache()
     return {"status": "inactive", "token": None, "expires_at": None, "client_id": None}
+
+def get_auth_debug_info():
+    info = {
+        "hf_enabled": _hf_enabled(),
+        "local_cache_exists": os.path.exists(TOKEN_CACHE_FILE),
+        "local_token_valid": False,
+        "hf_token_valid": False,
+        "profile_valid": False,
+    }
+    token = get_cached_token()
+    if token:
+        info["token_exists"] = True
+        info["profile_valid"] = verify_token(token)
+    else:
+        info["token_exists"] = False
+    if _hf_enabled():
+        hf_token = _load_token_from_hf()
+        info["hf_token_valid"] = hf_token is not None
+    return info
