@@ -29,10 +29,16 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
             to_date=to_date[:10],
             interval=interval,
         )
+        st.caption(f"API resp keys: {list(resp.keys()) if resp else 'None'}, status: {resp.get('status')}")
         if resp.get("status") == "success" and resp.get("data"):
             data = resp["data"]
+            st.caption(f"Data keys: {list(data.keys()) if isinstance(data, dict) else type(data).__name__}")
             opt_key = "CE" if option_type.upper() == "CALL" else "PE"
             opt_data = data.get(opt_key) or data.get(opt_key.lower())
+            if opt_data:
+                st.caption(f"Opt data keys: {list(opt_data.keys())[:5] if isinstance(opt_data, dict) else type(opt_data).__name__}, has timestamp: {bool(opt_data.get('timestamp'))}")
+            else:
+                st.caption(f"opt_data is None for key '{opt_key}'")
             if opt_data and opt_data.get("timestamp"):
                 return _parse_candle_response(opt_data)
         return pd.DataFrame()
