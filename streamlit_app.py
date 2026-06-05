@@ -193,10 +193,16 @@ def render_backtest_tab():
 
         col_dates = st.columns(2)
         with col_dates[0]:
-            from_date = st.date_input("From Date", datetime.now() - timedelta(days=60),
-                help="Max 30 days per API call, but system auto-chunks larger ranges")
+            st.caption("Period")
+            period = st.selectbox("Select range", ["1 Year", "3 Years", "5 Years", "10 Years"], index=0, label_visibility="collapsed")
         with col_dates[1]:
             to_date = st.date_input("To Date", datetime.now())
+        years_map = {"1 Year": 1, "3 Years": 3, "5 Years": 5, "10 Years": 10}
+        try:
+            from_date = to_date.replace(year=to_date.year - years_map[period])
+        except ValueError:
+            from_date = to_date.replace(year=to_date.year - years_map[period], day=28)
+        st.caption(f"📅 {from_date.strftime('%d-%b-%Y')} → {to_date.strftime('%d-%b-%Y')}")
 
         st.subheader("🎯 Exit Conditions")
         use_target = st.checkbox("Target")
