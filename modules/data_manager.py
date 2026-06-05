@@ -12,35 +12,47 @@ def _valid_interval(interval):
     interval_map = {1: 1, 5: 5, 15: 15, 30: 25, 60: 60}
     return interval_map.get(interval, 15)
 
+def _chunk_dates(from_date, to_date, max_days=90):
+    from_dt = datetime.strptime(from_date[:10], "%Y-%m-%d")
+    to_dt = datetime.strptime(to_date[:10], "%Y-%m-%d")
+    chunks = []
+    current = from_dt
+    while current < to_dt:
+        chunk_end = min(current + timedelta(days=max_days - 1), to_dt)
+        chunks.append((current.strftime("%Y-%m-%d"), chunk_end.strftime("%Y-%m-%d")))
+        current = chunk_end + timedelta(days=1)
+    return chunks
+
 def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_type,
                                 from_date, to_date, interval=15):
     interval = _valid_interval(interval)
     try:
-        resp = dhan.expired_options_data(
-            security_id=NIFTY_SECURITY_ID,
-            exchange_segment=dhanhq.NSE_FNO,
-            instrument_type="OPTIDX",
-            expiry_flag=expiry_flag,
-            expiry_code=expiry_code,
-            strike=strike,
-            drv_option_type=option_type,
-            required_data=["open", "high", "low", "close", "volume", "oi", "iv", "spot"],
-            from_date=from_date[:10],
-            to_date=to_date[:10],
-            interval=interval,
-        )
-        st.caption(f"API resp keys: {list(resp.keys()) if resp else 'None'}, status: {resp.get('status')}, remarks: {resp.get('remarks')}")
-        if resp.get("status") == "success" and resp.get("data"):
-            data = resp["data"]
-            st.caption(f"Data keys: {list(data.keys()) if isinstance(data, dict) else type(data).__name__}")
-            opt_key = "CE" if option_type.upper() == "CALL" else "PE"
-            opt_data = data.get(opt_key) or data.get(opt_key.lower())
-            if opt_data:
-                st.caption(f"Opt data keys: {list(opt_data.keys())[:5] if isinstance(opt_data, dict) else type(opt_data).__name__}, has timestamp: {bool(opt_data.get('timestamp'))}")
-            else:
-                st.caption(f"opt_data is None for key '{opt_key}'")
-            if opt_data and opt_data.get("timestamp"):
-                return _parse_candle_response(opt_data)
+        all_dfs = []
+        date_chunks = _chunk_dates(from_date, to_date)
+        for chunk_from, chunk_to in date_chunks:
+            resp = dhan.expired_options_data(
+                security_id=NIFTY_SECURITY_ID,
+                exchange_segment=dhanhq.NSE_FNO,
+                instrument_type="OPTIDX",
+                expiry_flag=expiry_flag,
+                expiry_code=expiry_code,
+                strike=strike,
+                drv_option_type=option_type,
+                required_data=["open", "high", "low", "close", "volume", "oi", "iv", "spot"],
+                from_date=chunk_from,
+                to_date=chunk_to,
+                interval=interval,
+            )
+            if resp.get("status") == "success" and resp.get("data"):
+                data = resp["data"]
+                opt_key = "CE" if option_type.upper() == "CALL" else "PE"
+                opt_data = data.get(opt_key) or data.get(opt_key.lower())
+                if opt_data and opt_data.get("timestamp"):
+                    all_dfs.append(_parse_candle_response(opt_data))
+        if all_dfs:
+            result = pd.concat(all_dfs, ignore_index=True)
+            result = result.drop_duplicates(subset="timestamp").sort_values("timestamp").reset_index(drop=True)
+            return result
         return pd.DataFrame()
     except Exception as e:
         st.warning(f"Expired options data error: {e}")
