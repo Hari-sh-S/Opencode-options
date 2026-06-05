@@ -92,22 +92,14 @@ def get_cached_token():
                 if isinstance(expiry, str):
                     expiry = datetime.fromisoformat(expiry)
                 if datetime.now() < expiry:
-                    if verify_token(cache["access_token"]):
-                        return cache["access_token"]
+                    token = cache["access_token"]
         except Exception:
             pass
-    if os.path.exists(TOKEN_CACHE_FILE):
-        try:
-            os.remove(TOKEN_CACHE_FILE)
-        except Exception:
-            pass
-    token = _load_token_from_hf()
-    if token:
-        if verify_token(token):
+    if not token:
+        token = _load_token_from_hf()
+        if token:
             cache_token(token)
-            return token
-        _delete_token_from_hf()
-    return None
+    return token
 
 def cache_token(access_token):
     expiry = datetime.now() + timedelta(hours=23, minutes=30)
@@ -125,7 +117,7 @@ def verify_token(token):
     try:
         dhan_login = DhanLogin(client_id)
         profile = dhan_login.user_profile(token)
-        return profile and profile.get("status") == "success"
+        return profile is not None
     except Exception:
         return False
 
@@ -175,17 +167,24 @@ def check_auth_status():
     if token:
         client_id = st.secrets.get("DHAN_CLIENT_ID", "")
         valid = verify_token(token)
+        expiry = None
+        if os.path.exists(TOKEN_CACHE_FILE):
+            try:
+                with open(TOKEN_CACHE_FILE, "rb") as f:
+                    cache = pickle.load(f)
+                expiry = cache.get("expiry")
+                if isinstance(expiry, str):
+                    expiry = datetime.fromisoformat(expiry)
+            except Exception:
+                pass
         if valid:
-            expiry = None
-            if os.path.exists(TOKEN_CACHE_FILE):
-                try:
-                    with open(TOKEN_CACHE_FILE, "rb") as f:
-                        cache = pickle.load(f)
-                    expiry = cache.get("expiry")
-                    if isinstance(expiry, str):
-                        expiry = datetime.fromisoformat(expiry)
-                except Exception:
-                    pass
+            return {
+                "status": "active",
+                "token": token,
+                "expires_at": expiry,
+                "client_id": client_id,
+            }
+        if expiry and datetime.now() < expiry:
             return {
                 "status": "active",
                 "token": token,
