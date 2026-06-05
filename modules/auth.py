@@ -82,6 +82,7 @@ def _delete_token_from_hf():
         pass
 
 def get_cached_token():
+    token = None
     if os.path.exists(TOKEN_CACHE_FILE):
         try:
             with open(TOKEN_CACHE_FILE, "rb") as f:
@@ -91,13 +92,22 @@ def get_cached_token():
                 if isinstance(expiry, str):
                     expiry = datetime.fromisoformat(expiry)
                 if datetime.now() < expiry:
-                    return cache["access_token"]
+                    if verify_token(cache["access_token"]):
+                        return cache["access_token"]
+        except Exception:
+            pass
+    if os.path.exists(TOKEN_CACHE_FILE):
+        try:
+            os.remove(TOKEN_CACHE_FILE)
         except Exception:
             pass
     token = _load_token_from_hf()
     if token:
-        cache_token(token)
-    return token
+        if verify_token(token):
+            cache_token(token)
+            return token
+        _delete_token_from_hf()
+    return None
 
 def cache_token(access_token):
     expiry = datetime.now() + timedelta(hours=23, minutes=30)
@@ -164,25 +174,25 @@ def check_auth_status():
     token = get_cached_token()
     if token:
         client_id = st.secrets.get("DHAN_CLIENT_ID", "")
-        try:
-            dhan_login = DhanLogin(client_id)
-            profile = dhan_login.user_profile(token)
-            if profile and profile.get("status") == "success":
-                expiry = None
-                if os.path.exists(TOKEN_CACHE_FILE):
+        valid = verify_token(token)
+        if valid:
+            expiry = None
+            if os.path.exists(TOKEN_CACHE_FILE):
+                try:
                     with open(TOKEN_CACHE_FILE, "rb") as f:
                         cache = pickle.load(f)
                     expiry = cache.get("expiry")
                     if isinstance(expiry, str):
                         expiry = datetime.fromisoformat(expiry)
-                return {
-                    "status": "active",
-                    "token": token,
-                    "expires_at": expiry,
-                    "client_id": client_id,
-                }
-        except Exception:
-            clear_token_cache()
+                except Exception:
+                    pass
+            return {
+                "status": "active",
+                "token": token,
+                "expires_at": expiry,
+                "client_id": client_id,
+            }
+        clear_token_cache()
     return {"status": "inactive", "token": None, "expires_at": None, "client_id": None}
 
 def get_auth_debug_info():
@@ -192,14 +202,34 @@ def get_auth_debug_info():
         "local_token_valid": False,
         "hf_token_valid": False,
         "profile_valid": False,
+        "profile_error": None,
     }
-    token = get_cached_token()
-    if token:
-        info["token_exists"] = True
-        info["profile_valid"] = verify_token(token)
-    else:
-        info["token_exists"] = False
+    token = None
+    if os.path.exists(TOKEN_CACHE_FILE):
+        try:
+            with open(TOKEN_CACHE_FILE, "rb") as f:
+                cache = pickle.load(f)
+            expiry = cache.get("expiry")
+            if isinstance(expiry, str):
+                expiry = datetime.fromisoformat(expiry)
+            info["local_token_valid"] = datetime.now() < expiry if expiry else False
+        except Exception:
+            pass
     if _hf_enabled():
         hf_token = _load_token_from_hf()
         info["hf_token_valid"] = hf_token is not None
+    token = get_cached_token()
+    if token:
+        info["token_exists"] = True
+        client_id = st.secrets.get("DHAN_CLIENT_ID", "")
+        try:
+            dhan_login = DhanLogin(client_id)
+            profile = dhan_login.user_profile(token)
+            info["profile_valid"] = profile and profile.get("status") == "success"
+            if not info["profile_valid"]:
+                info["profile_error"] = str(profile)
+        except Exception as e:
+            info["profile_error"] = str(e)
+    else:
+        info["token_exists"] = False
     return info
