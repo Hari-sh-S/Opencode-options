@@ -6,12 +6,15 @@ from dhanhq import dhanhq
 
 NIFTY_SECURITY_ID = "13"
 
-OPTIONS_INTERVAL_MAP = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "60m": 60}
+OPTIONS_INTERVAL_MAP = {"1m": 1, "5m": 5, "15m": 15, "30m": 25, "60m": 60}
+
+def _valid_interval(interval):
+    interval_map = {1: 1, 5: 5, 15: 15, 30: 25, 60: 60}
+    return interval_map.get(interval, 15)
 
 def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_type,
                                 from_date, to_date, interval=15):
-    if interval not in OPTIONS_INTERVAL_MAP.values():
-        interval = 15
+    interval = _valid_interval(interval)
     try:
         resp = dhan.expired_options_data(
             security_id=NIFTY_SECURITY_ID,
@@ -28,8 +31,8 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
         )
         if resp.get("status") == "success" and resp.get("data"):
             data = resp["data"]
-            opt_key = "ce" if option_type.upper() == "CALL" else "pe"
-            opt_data = data.get(opt_key)
+            opt_key = "CE" if option_type.upper() == "CALL" else "PE"
+            opt_data = data.get(opt_key) or data.get(opt_key.lower())
             if opt_data and opt_data.get("timestamp"):
                 return _parse_candle_response(opt_data)
         return pd.DataFrame()
