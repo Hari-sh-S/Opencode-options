@@ -132,9 +132,17 @@ def render_auth_tab():
             st.metric("India VIX", f"{vix['current']:.2f}", f"{vix['change']:.2f}")
         if st.session_state.expiry_list:
             with st.expander("Available Expiry Dates"):
-                for e in st.session_state.expiry_list[:15]:
-                    st.write(f"- {e}")
-                if len(st.session_state.expiry_list) > 15:
+                exp_list = st.session_state.expiry_list
+                if isinstance(exp_list, (list, tuple)):
+                    for e in exp_list[:15]:
+                        st.write(f"- {e}")
+                    if len(exp_list) > 15:
+                        st.caption(f"... and {len(exp_list)-15} more")
+                elif isinstance(exp_list, dict):
+                    for i, (k, v) in enumerate(list(exp_list.items())[:15]):
+                        st.write(f"- {k}: {v}")
+                else:
+                    st.write(str(exp_list)[:500])
                     st.caption(f"... and {len(st.session_state.expiry_list)-15} more")
 
 def render_backtest_tab():
