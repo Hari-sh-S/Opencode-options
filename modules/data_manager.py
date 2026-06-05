@@ -29,7 +29,7 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
     try:
         all_dfs = []
         date_chunks = _chunk_dates(from_date, to_date)
-        for chunk_from, chunk_to in date_chunks:
+        for i, (chunk_from, chunk_to) in enumerate(date_chunks):
             resp = dhan.expired_options_data(
                 security_id=NIFTY_SECURITY_ID,
                 exchange_segment=dhanhq.NSE_FNO,
@@ -49,10 +49,18 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
                 opt_data = data.get(opt_key) or data.get(opt_key.lower())
                 if opt_data and opt_data.get("timestamp"):
                     all_dfs.append(_parse_candle_response(opt_data))
+                else:
+                    st.info(f"Chunk {i+1}/{len(date_chunks)} ({chunk_from} to {chunk_to}): no {opt_key} data")
+            else:
+                err_msg = resp.get("remarks", resp.get("status", "unknown"))
+                if isinstance(err_msg, dict):
+                    err_msg = err_msg.get("error_message", str(err_msg))
+                st.info(f"Chunk {i+1}/{len(date_chunks)} ({chunk_from} to {chunk_to}): {err_msg}")
         if all_dfs:
             result = pd.concat(all_dfs, ignore_index=True)
             result = result.drop_duplicates(subset="timestamp").sort_values("timestamp").reset_index(drop=True)
             return result
+        st.info(f"No data across {len(date_chunks)} chunk(s). Total chunks queried.")
         return pd.DataFrame()
     except Exception as e:
         st.warning(f"Expired options data error: {e}")
