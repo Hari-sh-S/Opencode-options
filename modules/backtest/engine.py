@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
+from datetime import datetime, time as dtime
 from modules.formula_parser import parse_formula, evaluate_formula_node
 from modules.data_manager import (
-    fetch_expired_options_data, build_backtest_data_bundle, resample_to_timeframe
+    fetch_expired_options_data, build_backtest_data_bundle, resample_to_timeframe,
+    fetch_expiry_list
 )
 from modules.position_sizing import calculate_position_size
 from modules.backtest.metrics import calculate_metrics
@@ -59,6 +61,28 @@ class BacktestEngine:
         if progress_callback:
             progress_callback(0.2, f"Loaded {len(opt_df)} bars of option data")
 
+        expiry_boundaries = []
+        if expiry_flag == "WEEK" and not any([exit_config.get("target_pct"), exit_config.get("stop_loss_pct"), exit_config.get("exit_bar_count")]):
+            try:
+                expiries = fetch_expiry_list(self.dhan)
+                if expiries:
+                    cutoff = datetime.strptime(from_date[:10], "%Y-%m-%d") if from_date else opt_df["timestamp"].min()
+                    expiry_times = []
+                    for e in expiries:
+                        ed = datetime.strptime(str(e)[:10], "%Y-%m-%d")
+                        ed_close = ed.replace(hour=15, minute=30, second=0)
+                        if ed_close > cutoff:
+                            expiry_times.append(ed_close)
+                    expiry_times.sort()
+                    for et in expiry_times:
+                        mask = (opt_df["timestamp"].dt.date == et.date()) & (opt_df["timestamp"].dt.time <= dtime(15, 30))
+                        boundary_idx = mask.idxmax() if mask.any() else None
+                        if boundary_idx is not None:
+                            expiry_boundaries.append(boundary_idx)
+            except Exception:
+                pass
+        expiry_set = set(expiry_boundaries)
+
         total_bars = len(opt_df)
         available_capital = float(capital)
         lot_size = 50
@@ -88,6 +112,9 @@ class BacktestEngine:
                     bars_held = i - self.entry_bar_idx
                     if bars_held >= exit_config["exit_bar_count"]:
                         exit_reason = "candle_count"
+
+                if not exit_reason and i in expiry_set:
+                    exit_reason = "expiry"
 
                 if not exit_reason and i == total_bars - 1:
                     exit_reason = "end_of_data"
