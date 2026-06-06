@@ -145,9 +145,11 @@ class BacktestEngine:
                     })
                     self.current_position = None
                     self.entry_bar_idx = None
+                    if progress_callback:
+                        progress_callback(0.2 + 0.7 * (i / total_bars), f"EXIT at bar {i}: reason={exit_reason}, pnl={pnl:.0f}, trades={len(self.trades)}")
                     continue
 
-            if self.current_position is None and len(self.trades) < max_positions:
+            if self.current_position is None:
                 window = opt_df.iloc[:i+1].copy()
                 data_bundle = build_backtest_data_bundle(window)
                 data_bundle_full = {timeframe: data_bundle}
@@ -155,9 +157,8 @@ class BacktestEngine:
                     parsed_entry, data_bundle_full, i
                 )
                 if eval_error:
-                    if i < 5 or i % 500 == 0:
-                        if progress_callback:
-                            progress_callback(0.2 + 0.7 * (i / total_bars), f"Eval error at bar {i}: {eval_error}")
+                    if progress_callback and (i < 5 or i % 500 == 0):
+                        progress_callback(0.2 + 0.7 * (i / total_bars), f"Eval error at bar {i}: {eval_error}")
                 if should_enter:
                     option_price = opt_df["close"].iloc[i]
                     if option_price > 0:
@@ -175,6 +176,8 @@ class BacktestEngine:
                                 "quantity": quantity,
                             }
                             self.entry_bar_idx = i
+                            if progress_callback:
+                                progress_callback(0.2 + 0.7 * (i / total_bars), f"ENTER at bar {i}: {opt_df['timestamp'].iloc[i]}, price={option_price:.2f}")
 
             if progress_callback and total_bars > 20 and i % max(1, total_bars // 20) == 0:
                 progress_callback(
