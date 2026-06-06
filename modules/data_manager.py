@@ -24,16 +24,28 @@ def _chunk_dates(from_date, to_date, max_days=30):
     return chunks
 
 def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_type,
-                                from_date, to_date, interval=15):
+                                from_date, to_date, interval=15, progress_callback=None):
     interval = _valid_interval(interval)
     try:
         all_dfs = []
         date_chunks = _chunk_dates(from_date, to_date)
+        total_chunks = len(date_chunks)
         chunks_with_data = 0
         chunks_no_data = 0
         chunks_failed = 0
+        start_time = datetime.now()
         
         for i, (chunk_from, chunk_to) in enumerate(date_chunks):
+            if progress_callback:
+                pct = (i / total_chunks) * 100
+                elapsed = (datetime.now() - start_time).total_seconds()
+                rate = (i + 1) / max(elapsed, 1)
+                remaining = (total_chunks - i - 1) / max(rate, 0.01)
+                eta = f"{int(remaining)}s" if remaining < 120 else f"{remaining/60:.1f}m"
+                progress_callback(
+                    pct / 100,
+                    f"Fetching data: chunk {i+1}/{total_chunks} ({pct:.0f}%) — ETA: {eta}"
+                )
             resp = dhan.expired_options_data(
                 security_id=int(NIFTY_SECURITY_ID),
                 exchange_segment="NSE_FNO",
@@ -63,11 +75,12 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
         if all_dfs:
             result = pd.concat(all_dfs, ignore_index=True)
             result = result.drop_duplicates(subset="timestamp").sort_values("timestamp").reset_index(drop=True)
-            st.info(f"Data loaded: {chunks_with_data} chunks OK, {chunks_no_data} no data, {chunks_failed} failed. Total bars: {len(result)}")
+            elapsed = (datetime.now() - start_time).total_seconds()
+            st.info(f"Data loaded: {chunks_with_data} chunks OK, {chunks_no_data} no data, {chunks_failed} failed. Total bars: {len(result)} ({elapsed:.0f}s)")
             return result
         
         st.warning(f"No data found for {strike} {option_type} {expiry_flag} code {expiry_code} ({from_date} to {to_date}). "
-                   f"Chunks: {len(date_chunks)} tried. Suggestions: "
+                   f"Chunks: {total_chunks} tried. Suggestions: "
                    f"1) Try shorter date range (last 6 months), "
                    f"2) Try MONTH expiry instead of WEEK, "
                    f"3) Try different strike/option type.")

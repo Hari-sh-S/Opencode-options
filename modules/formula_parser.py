@@ -156,6 +156,8 @@ def evaluate_formula_node(node, data_bundle, current_idx):
             return left_val or right_val, None
     condition = node["condition"]
     tf_data = data_bundle.get(condition.timeframe)
+    if tf_data is None and len(data_bundle) == 1:
+        tf_data = next(iter(data_bundle.values()))
     if tf_data is None:
         return False, f"No data for timeframe {condition.timeframe}"
     df = tf_data.get(condition.entity if condition.entity != "Index" else "index")

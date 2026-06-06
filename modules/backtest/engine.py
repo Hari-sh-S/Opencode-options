@@ -50,6 +50,7 @@ class BacktestEngine:
         opt_df = fetch_expired_options_data(
             self.dhan, expiry_flag, expiry_code, strike,
             option_type, from_date, to_date, interval,
+            progress_callback=progress_callback,
         )
 
         if opt_df.empty:
@@ -123,6 +124,10 @@ class BacktestEngine:
                 should_enter, eval_error = evaluate_formula_node(
                     parsed_entry, data_bundle_full, i
                 )
+                if eval_error:
+                    if i < 5 or i % 500 == 0:
+                        if progress_callback:
+                            progress_callback(0.2 + 0.7 * (i / total_bars), f"Eval error at bar {i}: {eval_error}")
                 if should_enter:
                     option_price = opt_df["close"].iloc[i]
                     if option_price > 0:
