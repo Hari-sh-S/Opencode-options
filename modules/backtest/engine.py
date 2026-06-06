@@ -63,8 +63,6 @@ class BacktestEngine:
         available_capital = float(capital)
         lot_size = 50
 
-        exit_bar_count_default = 5 if not any([exit_config.get("target_pct"), exit_config.get("stop_loss_pct"), exit_config.get("exit_bar_count")]) else None
-
         for i in range(1, total_bars):
             if self.current_position is not None:
                 pos = self.current_position
@@ -86,10 +84,9 @@ class BacktestEngine:
                         if pnl_pct <= -exit_config["stop_loss_pct"]:
                             exit_reason = "stop_loss"
 
-                bars_to_check = exit_config.get("exit_bar_count") or exit_bar_count_default
-                if not exit_reason and bars_to_check:
+                if not exit_reason and exit_config.get("exit_bar_count"):
                     bars_held = i - self.entry_bar_idx
-                    if bars_held >= bars_to_check:
+                    if bars_held >= exit_config["exit_bar_count"]:
                         exit_reason = "candle_count"
 
                 if not exit_reason and i == total_bars - 1:
