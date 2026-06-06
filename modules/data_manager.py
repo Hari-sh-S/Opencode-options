@@ -48,9 +48,10 @@ def fetch_expired_options_data(dhan, expiry_flag, expiry_code, strike, option_ty
                 interval=interval,
             )
             if resp.get("status") == "success" and resp.get("data"):
-                data = resp["data"]
+                data = resp.get("data", {})
+                nested_data = data.get("data", {})
                 opt_key = "CE" if option_type.upper() == "CALL" else "PE"
-                opt_data = data.get(opt_key) or data.get(opt_key.lower())
+                opt_data = nested_data.get(opt_key) or nested_data.get(opt_key.lower())
                 if opt_data and opt_data.get("timestamp"):
                     all_dfs.append(_parse_candle_response(opt_data))
                     chunks_with_data += 1
