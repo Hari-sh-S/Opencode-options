@@ -67,20 +67,23 @@ class BacktestEngine:
                 expiries = fetch_expiry_list(self.dhan)
                 if expiries:
                     cutoff = datetime.strptime(from_date[:10], "%Y-%m-%d") if from_date else opt_df["timestamp"].min()
-                    expiry_times = []
-                    for e in expiries:
-                        ed = datetime.strptime(str(e)[:10], "%Y-%m-%d")
-                        ed_close = ed.replace(hour=15, minute=30, second=0)
-                        if ed_close > cutoff:
-                            expiry_times.append(ed_close)
-                    expiry_times.sort()
-                    for et in expiry_times:
-                        mask = (opt_df["timestamp"].dt.date == et.date()) & (opt_df["timestamp"].dt.time <= dtime(15, 30))
-                        boundary_idx = mask.idxmax() if mask.any() else None
-                        if boundary_idx is not None:
-                            expiry_boundaries.append(boundary_idx)
-            except Exception:
-                pass
+                expiry_times = []
+                for e in expiries:
+                    ed = datetime.strptime(str(e)[:10], "%Y-%m-%d")
+                    ed_close = ed.replace(hour=15, minute=30, second=0)
+                    if ed_close > cutoff:
+                        expiry_times.append(ed_close)
+                expiry_times.sort()
+                for et in expiry_times:
+                    mask = (opt_df["timestamp"].dt.date == et.date()) & (opt_df["timestamp"].dt.time <= dtime(15, 30))
+                    if mask.any():
+                        boundary_idx = mask[mask].index[-1]
+                        expiry_boundaries.append(boundary_idx)
+            except Exception as e:
+                if progress_callback:
+                    progress_callback(0.2, f"Expiry detection: {e}")
+        if progress_callback and expiry_flag == "WEEK" and not any([exit_config.get("target_pct"), exit_config.get("stop_loss_pct"), exit_config.get("exit_bar_count")]):
+            progress_callback(0.2, f"Found {len(expiry_boundaries)} expiry boundaries")
         expiry_set = set(expiry_boundaries)
 
         total_bars = len(opt_df)
