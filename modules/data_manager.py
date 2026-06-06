@@ -12,7 +12,7 @@ def _valid_interval(interval):
     interval_map = {1: 1, 5: 5, 15: 15, 30: 25, 60: 60}
     return interval_map.get(interval, 15)
 
-def _chunk_dates(from_date, to_date, max_days=5):
+def _chunk_dates(from_date, to_date, max_days=30):
     from_dt = datetime.strptime(from_date[:10], "%Y-%m-%d")
     to_dt = datetime.strptime(to_date[:10], "%Y-%m-%d")
     chunks = []

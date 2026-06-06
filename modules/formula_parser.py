@@ -171,10 +171,20 @@ def evaluate_formula_node(node, data_bundle, current_idx):
             return False, f"Could not compute {condition.indicator}"
         current_value = values.iloc[current_idx] if current_idx < len(values) else values.iloc[-1]
         if condition.operator and condition.compare_value is not None:
-            try:
-                cv = float(condition.compare_value)
-            except ValueError:
-                return False, f"Invalid comparison value: {condition.compare_value}"
+            compare_field_map = {
+                "Open": "open", "High": "high", "Low": "low", "Close": "close",
+                "Volume": "volume", "OI": "oi", "IV": "iv", "Spot": "spot",
+            }
+            if condition.compare_value in compare_field_map:
+                col = compare_field_map[condition.compare_value]
+                cv = float(df[col].iloc[current_idx]) if col in df.columns else None
+            else:
+                try:
+                    cv = float(condition.compare_value)
+                except ValueError:
+                    return False, f"Invalid comparison value: {condition.compare_value}"
+            if cv is None:
+                return False, f"Field '{condition.compare_value}' not in data"
             if condition.operator == ">":
                 return bool(current_value > cv), None
             elif condition.operator == ">=":
